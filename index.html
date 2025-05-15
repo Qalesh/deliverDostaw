@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator PDF</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            background-color: #ece9d8;
+            margin: 0;
+            padding: 20px;
+            color: #000;
+            display: flex;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            min-width: 0;
+        }
+        .okno {
+            background-color: #ffffff;
+            border: 1px solid #003c74;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .pasekTytulu {
+            background: linear-gradient(to right, #0058b1, #4d94ff);
+            color: white;
+            padding: 8px 10px;
+            font-weight: bold;
+            font-size: 12px;
+            border-bottom: 1px solid #003c74;
+        }
+        .cialoOkna {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .podgladPdf {
+            background: white;
+            border: 1px dashed #a7abb1;
+            min-height: 100%;
+            padding: 15px;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        .rubryka {
+            margin-bottom: 15px;
+            border: 1px solid #a7abb1;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 3px;
+        }
+        .etykieta {
+            display: inline-block;
+            width: 100px;
+            font-size: 12px;
+            color: #1a3e8c;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="date"] {
+            border: 1px solid #7d9edb;
+            padding: 4px;
+            background-color: #fff;
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            font-size: 12px;
+            width: 200px;
+            border-radius: 3px;
+        }
+        .wiersz {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .lewa, .prawa {
+            flex: 1;
+        }
+        .lewa {
+            text-align: left;
+        }
+        .prawa {
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .przycisk {
+            background: linear-gradient(to bottom, #f6f8fa, #e5e8ee);
+            border: 1px solid #7d9edb;
+            padding: 4px 12px;
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            font-size: 11px;
+            cursor: pointer;
+            margin-right: 5px;
+            min-width: 80px;
+            border-radius: 3px;
+            color: #1a3e8c;
+            font-weight: bold;
+        }
+        .przycisk:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .przyciskUsun {
+            color: #c00;
+            border-color: #d88;
+        }
+        .przyciskUsunLinie {
+            padding: 2px 6px;
+            margin-left: 5px;
+            min-width: 20px;
+            background: linear-gradient(to bottom, #ffd3d3, #ffb5b5);
+            border-color: #d88;
+        }
+        .dataPodgladu {
+            text-align: right;
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .tytulRubryki {
+            font-weight: bold;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #000;
+            display: inline-block;
+        }
+        .komunikatOstrzezenie {
+            color: #c00;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 5px;
+            background: #ffebeb;
+            border: 1px solid #c00;
+            border-radius: 3px;
+        }
+        .kontroleCzcionki {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .przyciskCzcionka {
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .rozmiarCzcionkiInfo {
+            font-size: 12px;
+            margin-left: 10px;
+            color: #1a3e8c;
+        }
+    </style>
+</head>
+<body>
+    <!-- Panel formularza -->
+    <div class="panel">
+        <div class="okno">
+            <div class="pasekTytulu">Generator Dokumentów PDF</div>
+            <div class="cialoOkna">
+                <div class="kontroleCzcionki">
+                    <button class="przycisk przyciskCzcionka" onclick="zmienRozmiarCzcionki(-1)">A-</button>
+                    <button class="przycisk przyciskCzcionka" onclick="zmienRozmiarCzcionki(1)">A+</button>
+                    <span class="rozmiarCzcionkiInfo">Rozmiar czcionki: <span id="wartoscRozmiaruCzcionki">12</span>pt</span>
+                </div>
+                
+                <div>
+                    <label class="etykieta">Data dokumentu:</label>
+                    <input type="date" id="poleDaty">
+                </div>
+                
+                <div id="kontenerRubryk">
+                    <div class="rubryka" data-id="1">
+                        <div>
+                            <label class="etykieta">Tytuł rubryki:</label>
+                            <input type="text" class="poleTytuluRubryki" onkeydown="obsluzKlawisze(event, 1, 0)" oninput="aktualizujPodglad()">
+                        </div>
+                        <div class="kontenerLinii" data-id-rubryki="1">
+                            <div class="wiersz" data-id-linii="1-1">
+                                <div class="lewa">
+                                    <input type="text" class="poleLewe" onkeydown="obsluzKlawisze(event, 1, 1)" oninput="aktualizujPodglad()">
+                                </div>
+                                <div class="prawa">
+                                    <input type="text" class="polePrawe" onkeydown="obsluzKlawisze(event, 1, 1)" oninput="aktualizujPodglad()">
+                                    <button class="przyciskUsunLinie" onclick="usunLinie('1-1')">X</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="przycisk" onclick="dodajLinie(1)">Dodaj linię</button>
+                        <button class="przyciskUsun" onclick="usunRubryke(1)">Usuń rubrykę</button>
+                    </div>
+                </div>
+                
+                <button class="przycisk" onclick="dodajRubryke()">Nowa rubryka</button>
+                <button class="przycisk" onclick="wygenerujPDF()">Generuj PDF</button>
+                <div id="komunikatLimit" class="komunikatOstrzezenie" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel podglądu -->
+    <div class="panel">
+        <div class="okno">
+            <div class="pasekTytulu">Podgląd dokumentu</div>
+            <div class="cialoOkna">
+                <div id="podgladPdf" class="podgladPdf"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        
+        // Zmienne globalne
+        let licznikRubryk = 1;
+        let licznikiLinii = {1: 1};
+        let przekroczonoLimitStron = false;
+        const MAKSYMALNA_LICZBA_STRON = 1;
+        let rozmiarCzcionki = 12;
+        let ignorujLimit = false;
+
+        // Inicjalizacja aplikacji
+        function zainicjujAplikacje() {
+            document.getElementById('poleDaty').valueAsDate = new Date();
+            aktualizujPodglad();
+            document.getElementById('poleDaty').addEventListener('change', aktualizujPodglad);
+        }
+
+        // Formatowanie daty
+        function formatujDate(data) {
+            const dniTygodnia = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
+            const miesiace = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
+            return `${dniTygodnia[data.getDay()]}, ${data.getDate()} ${miesiace[data.getMonth()]} ${data.getFullYear()} r.`;
+        }
+
+        // Zmiana rozmiaru czcionki
+        function zmienRozmiarCzcionki(wartosc) {
+            rozmiarCzcionki = Math.max(8, Math.min(24, rozmiarCzcionki + wartosc));
+            document.getElementById('wartoscRozmiaruCzcionki').textContent = rozmiarCzcionki;
+            aktualizujPodglad();
+        }
+
+        // Aktualizacja podglądu
+        function aktualizujPodglad() {
+            const data = new Date(document.getElementById('poleDaty').value);
+            const podglad = document.getElementById('podgladPdf');
+            let html = `<div class="dataPodgladu" style="font-size: ${rozmiarCzcionki-2}px">${formatujDate(data)}</div>`;
+            
+            document.querySelectorAll('.rubryka').forEach(rubryka => {
+                const tytul = rubryka.querySelector('.poleTytuluRubryki').value;
+                html += `<div class="rubrykaPodgladu"><div class="tytulRubryki" style="font-size: ${rozmiarCzcionki}px">${tytul || '[Brak tytułu]'}</div>`;
+                
+                rubryka.querySelectorAll('.wiersz').forEach(wiersz => {
+                    const tekstLewy = wiersz.querySelector('.poleLewe').value;
+                    const tekstPrawy = wiersz.querySelector('.polePrawe').value;
+                    
+                    html += `<div class="wierszPodgladu" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: ${rozmiarCzcionki}px">
+                                <div style="text-align: left;">${tekstLewy || ''}</div>
+                                <div style="text-align: right;">${tekstPrawy || ''}</div>
+                            </div>`;
+                });
+                
+                html += `<div style="border-top: 1px solid #000; margin: 10px 0;"></div></div>`;
+            });
+            
+            podglad.innerHTML = html;
+            sprawdzCzyMiesciSie();
+        }
+
+        // Sprawdzenie czy dokument mieści się w limicie stron
+        function sprawdzCzyMiesciSie() {
+            const testowyPdf = new jsPDF();
+            let pozycjaY = 25;
+            const wysokoscStrony = testowyPdf.internal.pageSize.getHeight();
+            let liczbaStron = 1;
+            
+            document.querySelectorAll('.rubryka').forEach(rubryka => {
+                pozycjaY += rozmiarCzcionki * 0.8; // Tytuł rubryki
+                pozycjaY += rubryka.querySelectorAll('.wiersz').length * rozmiarCzcionki * 0.6; // Linie
+                pozycjaY += 8; // Margines
+                
+                if (pozycjaY > wysokoscStrony - 15) {
+                    liczbaStron++;
+                    pozycjaY = 15;
+                }
+            });
+            
+            if (liczbaStron > MAKSYMALNA_LICZBA_STRON && !ignorujLimit) {
+                if (!przekroczonoLimitStron) {
+                    przekroczonoLimitStron = true;
+                    const komunikat = document.getElementById('komunikatLimit');
+                    komunikat.style.display = 'block';
+                    komunikat.innerHTML = `UWAGA: Dokument przekroczył limit ${MAKSYMALNA_LICZBA_STRON} strony! 
+                                          <button class="przycisk" onclick="ignorujLimitStron()" style="margin-left: 10px;">Kontynuuj mimo to</button>`;
+                    
+                    document.querySelectorAll('.przycisk').forEach(przycisk => {
+                        if (!przycisk.classList.contains('przyciskUsun') && 
+                            !przycisk.classList.contains('przyciskUsunLinie') &&
+                            !przycisk.classList.contains('przyciskCzcionka') &&
+                            przycisk.textContent !== 'Generuj PDF') {
+                            przycisk.disabled = true;
+                        }
+                    });
+                }
+                return false;
+            } else {
+                if (przekroczonoLimitStron) {
+                    document.getElementById('komunikatLimit').style.display = 'none';
+                    przekroczonoLimitStron = false;
+                    
+                    document.querySelectorAll('.przycisk').forEach(przycisk => {
+                        przycisk.disabled = false;
+                    });
+                }
+                return true;
+            }
+        }
+
+        // Ignorowanie limitu stron
+        function ignorujLimitStron() {
+            ignorujLimit = true;
+            przekroczonoLimitStron = false;
+            document.getElementById('komunikatLimit').style.display = 'none';
+            document.querySelectorAll('.przycisk').forEach(przycisk => {
+                przycisk.disabled = false;
+            });
+            aktualizujPodglad();
+        }
+
+        // Obsługa klawiszy
+        function obsluzKlawisze(event, idRubryki, numerLinii) {
+            if (event.key === 'Enter' && event.ctrlKey) {
+                event.preventDefault();
+                dodajRubryke();
+            } else if (event.key === 'Enter' && numerLinii > 0) {
+                event.preventDefault();
+                dodajLinie(idRubryki);
+            } else if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+                const wszystkiePola = Array.from(document.querySelectorAll('#poleDaty, .poleTytuluRubryki, .poleLewe, .polePrawe'));
+                const aktualnyIndex = wszystkiePola.indexOf(event.target);
+                let nastepnyIndex = aktualnyIndex;
+                switch(event.key) {
+                    case 'ArrowRight': nastepnyIndex++; break;
+                    case 'ArrowLeft': nastepnyIndex--; break;
+                    case 'ArrowDown': nastepnyIndex += 2; break;
+                    case 'ArrowUp': nastepnyIndex -= 2; break;
+                }
+                if (nastepnyIndex >= 0 && nastepnyIndex < wszystkiePola.length) {
+                    wszystkiePola[nastepnyIndex].focus();
+                }
+            }
+        }
+
+        // Dodawanie nowej rubryki
+        function dodajRubryke() {
+            if (przekroczonoLimitStron && !ignorujLimit) {
+                alert('Osiągnięto maksymalny rozmiar dokumentu (1 strona)! Proszę usuń istniejące rubryki lub wygeneruj PDF.');
+                return;
+            }
+            
+            licznikRubryk++;
+            licznikiLinii[licznikRubryk] = 1;
+            const nowaRubryka = document.createElement('div');
+            nowaRubryka.className = 'rubryka';
+            nowaRubryka.setAttribute('data-id', licznikRubryk);
+            nowaRubryka.innerHTML = `
+                <div>
+                    <label class="etykieta">Tytuł rubryki:</label>
+                    <input type="text" class="poleTytuluRubryki" onkeydown="obsluzKlawisze(event, ${licznikRubryk}, 0)" oninput="aktualizujPodglad()">
+                </div>
+                <div class="kontenerLinii" data-id-rubryki="${licznikRubryk}">
+                    <div class="wiersz" data-id-linii="${licznikRubryk}-1">
+                        <div class="lewa">
+                            <input type="text" class="poleLewe" onkeydown="obsluzKlawisze(event, ${licznikRubryk}, 1)" oninput="aktualizujPodglad()">
+                        </div>
+                        <div class="prawa">
+                            <input type="text" class="polePrawe" onkeydown="obsluzKlawisze(event, ${licznikRubryk}, 1)" oninput="aktualizujPodglad()">
+                            <button class="przyciskUsunLinie" onclick="usunLinie('${licznikRubryk}-1')">X</button>
+                        </div>
+                    </div>
+                </div>
+                <button class="przycisk" onclick="dodajLinie(${licznikRubryk})">Dodaj linię</button>
+                <button class="przyciskUsun" onclick="usunRubryke(${licznikRubryk})">Usuń rubrykę</button>
+            `;
+            document.getElementById('kontenerRubryk').appendChild(nowaRubryka);
+            nowaRubryka.querySelector('.poleTytuluRubryki').focus();
+            aktualizujPodglad();
+        }
+
+        // Dodawanie nowej linii
+        function dodajLinie(idRubryki) {
+            if (przekroczonoLimitStron && !ignorujLimit) {
+                alert('Osiągnięto maksymalny rozmiar dokumentu (1 strona)! Proszę usuń istniejące linie lub wygeneruj PDF.');
+                return;
+            }
+            
+            licznikiLinii[idRubryki] = (licznikiLinii[idRubryki] || 0) + 1;
+            const idLinii = `${idRubryki}-${licznikiLinii[idRubryki]}`;
+            const nowaLinia = document.createElement('div');
+            nowaLinia.className = 'wiersz';
+            nowaLinia.setAttribute('data-id-linii', idLinii);
+            nowaLinia.innerHTML = `
+                <div class="lewa">
+                    <input type="text" class="poleLewe" onkeydown="obsluzKlawisze(event, ${idRubryki}, ${licznikiLinii[idRubryki]})" oninput="aktualizujPodglad()">
+                </div>
+                <div class="prawa">
+                    <input type="text" class="polePrawe" onkeydown="obsluzKlawisze(event, ${idRubryki}, ${licznikiLinii[idRubryki]})" oninput="aktualizujPodglad()">
+                    <button class="przyciskUsunLinie" onclick="usunLinie('${idLinii}')">X</button>
+                </div>
+            `;
+            document.querySelector(`.kontenerLinii[data-id-rubryki="${idRubryki}"]`).appendChild(nowaLinia);
+            nowaLinia.querySelector('.poleLewe').focus();
+            aktualizujPodglad();
+        }
+
+        // Usuwanie linii
+        function usunLinie(idLinii) {
+            const kontenerLinii = document.querySelector(`.kontenerLinii[data-id-rubryki="${idLinii.split('-')[0]}"]`);
+            if (kontenerLinii.children.length > 1) {
+                document.querySelector(`[data-id-linii="${idLinii}"]`).remove();
+                aktualizujPodglad();
+            } else {
+                alert('Rubryka musi mieć co najmniej jedną linię!');
+            }
+        }
+
+        // Usuwanie rubryki
+        function usunRubryke(id) {
+            if (document.querySelectorAll('.rubryka').length > 1) {
+                document.querySelector(`.rubryka[data-id="${id}"]`).remove();
+                delete licznikiLinii[id];
+                aktualizujPodglad();
+            } else {
+                alert('Musi pozostać co najmniej jedna rubryka!');
+            }
+        }
+
+        // Generowanie PDF z poprawionym formatowaniem
+        function wygenerujPDF() {
+            const data = new Date(document.getElementById('poleDaty').value);
+            const sformatowanaData = formatujDate(data);
+            const nazwaPliku = `Zaladunek_${['Niedz','Pon','Wt','Śr','Czw','Pt','Sob'][data.getDay()]}_${String(data.getDate()).padStart(2,'0')}_${String(data.getMonth()+1).padStart(2,'0')}.pdf`;
+            
+            let pdf = new jsPDF();
+            const marginesBoczny = 10;
+            const szerokoscStrony = pdf.internal.pageSize.getWidth() - 2 * marginesBoczny;
+            const szerokoscPrawejKolumny = 40;
+            const szerokoscLewejKolumny = szerokoscStrony - szerokoscPrawejKolumny - 10;
+            
+            pdf.setFontSize(rozmiarCzcionki-2);
+            pdf.setTextColor(100);
+            const szerokoscDaty = pdf.getStringUnitWidth(sformatowanaData) * (rozmiarCzcionki-2) / pdf.internal.scaleFactor;
+            pdf.text(sformatowanaData, pdf.internal.pageSize.getWidth() - marginesBoczny - szerokoscDaty, 10);
+            
+            pdf.setFontSize(rozmiarCzcionki);
+            pdf.setTextColor(0);
+            let pozycjaY = 25;
+
+            const rubryki = document.querySelectorAll('.rubryka');
+            rubryki.forEach((rubryka, index) => {
+                const tytul = rubryka.querySelector('.poleTytuluRubryki').value || '[Brak tytułu]';
+                const linie = rubryka.querySelectorAll('.wiersz');
+
+                // Sprawdź czy zmieścimy tytuł rubryki
+                if (pozycjaY > pdf.internal.pageSize.getHeight() - 20) {
+                    pdf.addPage();
+                    pozycjaY = 15;
+                    pdf.setFontSize(rozmiarCzcionki-2);
+                    pdf.text(sformatowanaData, pdf.internal.pageSize.getWidth() - marginesBoczny - szerokoscDaty, 10);
+                    pdf.setFontSize(rozmiarCzcionki);
+                }
+
+                // Dodaj tytuł rubryki
+                pdf.setFont(undefined, 'bold');
+                const linieTytulu = pdf.splitTextToSize(tytul, szerokoscStrony);
+                linieTytulu.forEach((linia, i) => {
+                    if (i > 0) pozycjaY += rozmiarCzcionki * 0.6;
+                    pdf.text(linia, marginesBoczny, pozycjaY);
+                });
+                
+                // Podkreślenie tylko pod ostatnią linią tytułu
+                const szerokoscOstatniejLinii = pdf.getStringUnitWidth(linieTytulu[linieTytulu.length-1]) * rozmiarCzcionki / pdf.internal.scaleFactor;
+                pdf.line(marginesBoczny, pozycjaY + 2, marginesBoczny + szerokoscOstatniejLinii, pozycjaY + 2);
+                
+                pozycjaY += rozmiarCzcionki * 0.8 + 5; // Dodatkowy odstęp po tytule
+                pdf.setFont(undefined, 'normal');
+
+                // Dodaj linie w rubryce
+                linie.forEach(linia => {
+                    const tekstLewy = linia.querySelector('.poleLewe').value || '';
+                    const tekstPrawy = linia.querySelector('.polePrawe').value || '';
+
+                    // Podziel tekst na linie
+                    const linieLewe = pdf.splitTextToSize(tekstLewy, szerokoscLewejKolumny);
+                    const liniePrawe = pdf.splitTextToSize(tekstPrawy, szerokoscPrawejKolumny);
+                    const liczbaLinii = Math.max(linieLewe.length, liniePrawe.length);
+
+                    for (let i = 0; i < liczbaLinii; i++) {
+                        // Sprawdź czy potrzebna nowa strona
+                        if (pozycjaY > pdf.internal.pageSize.getHeight() - 15) {
+                            pdf.addPage();
+                            pozycjaY = 15;
+                            pdf.setFontSize(rozmiarCzcionki-2);
+                            pdf.text(sformatowanaData, pdf.internal.pageSize.getWidth() - marginesBoczny - szerokoscDaty, 10);
+                            pdf.setFontSize(rozmiarCzcionki);
+                        }
+
+                        // Lewa kolumna
+                        if (linieLewe[i]) {
+                            pdf.text(linieLewe[i], marginesBoczny, pozycjaY);
+                        }
+
+                        // Prawa kolumna
+                        if (liniePrawe[i]) {
+                            const szerokoscTekstu = pdf.getStringUnitWidth(liniePrawe[i]) * rozmiarCzcionki / pdf.internal.scaleFactor;
+                            pdf.text(liniePrawe[i], pdf.internal.pageSize.getWidth() - marginesBoczny - szerokoscTekstu, pozycjaY);
+                        }
+
+                        pozycjaY += rozmiarCzcionki * 0.6;
+                    }
+                });
+
+                // Dodaj odstęp między rubrykami (7px) tylko jeśli to nie ostatnia rubryka
+                if (index < rubryki.length - 1) {
+                    pozycjaY += 7;
+                }
+            });
+
+            pdf.save(nazwaPliku);
+            ignorujLimit = false;
+        }
+
+        window.onload = zainicjujAplikacje;
+    </script>
+</body>
+</html>
